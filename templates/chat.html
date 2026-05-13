@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Онко-Чат | Маршрутный помощник</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; height: 100vh; display: flex; flex-direction: column; }
+        
+        /* Шапка */
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.2em; }
+        .user-info { display: flex; align-items: center; gap: 15px; }
+        .logout-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-size: 0.9em; }
+        .logout-btn:hover { background: rgba(255,255,255,0.3); }
+        
+        /* Основной контент */
+        .main-content { display: flex; flex: 1; overflow: hidden; padding: 20px; gap: 20px; }
+        
+        /* Левая панель - Маршрут */
+        .route-panel { width: 25%; background: white; border-radius: 15px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); overflow-y: auto; }
+        .panel-title { font-size: 1.1em; margin-bottom: 15px; color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 5px; }
+        .route-setup { background: #e3f2fd; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        .route-setup h3 { margin-bottom: 10px; color: #1976d2; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
+        .form-group select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; }
+        .btn-small { background: #667eea; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 0.9em; }
+        .btn-small:hover { background: #5a67d8; }
+        
+        /* Центральная панель - Чат */
+        .chat-panel { width: 50%; background: white; border-radius: 15px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); display: flex; flex-direction: column; }
+        .messages-container { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px; }
+        .message { max-width: 80%; padding: 12px; border-radius: 15px; position: relative; }
+        .user-message { background: #667eea; color: white; align-self: flex-end; border-bottom-right-radius: 5px; }
+        .ai-message { background: #f1f3f4; color: #333; align-self: flex-start; border-bottom-left-radius: 5px; }
+        .input-container { display: flex; gap: 10px; }
+        .message-input { flex: 1; padding: 12px; border: 2px solid #e9ecef; border-radius: 25px; outline: none; font-size: 14px; }
+        .message-input:focus { border-color: #667eea; }
+        .send-button { background: #667eea; color: white; border: none; border-radius: 25px; padding: 12px 20px; cursor: pointer; font-weight: bold; }
+        .send-button:hover { background: #5a67d8; }
+        
+        /* Правая панель - Информация */
+        .info-panel { width: 25%; background: white; border-radius: 15px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); overflow-y: auto; }
+        .info-section { margin-bottom: 20px; }
+        .info-section h3 { font-size: 1em; margin-bottom: 10px; color: #764ba2; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .appointment-item { background: #f8f9fa; padding: 10px; margin-bottom: 8px; border-radius: 8px; border-left: 3px solid #667eea; }
+        .appointment-status { font-size: 0.8em; padding: 2px 6px; border-radius: 10px; }
+        .status-scheduled { background: #ffc107; color: white; }
+        .status-completed { background: #28a745; color: white; }
+        .preparation-item { background: #e8f5e9; padding: 10px; margin-bottom: 8px; border-radius: 8px; border-left: 3px solid #28a745; font-size: 0.9em; }
+        
+        /* Адаптивность */
+        @media (max-width: 1200px) {
+            .route-panel, .info-panel { width: 30%; }
+            .chat-panel { width: 40%; }
+        }
+        
+        @media (max-width: 768px) {
+            .main-content { flex-direction: column; }
+            .route-panel, .chat-panel, .info-panel { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧭 Маршрутный помощник Онко-Чата</h1>
+        <div class="user-info">
+            <span id="userName">Пользователь</span>
+            <button class="logout-btn" id="logoutBtn">🚪 Выйти</button>
+        </div>
+    </div>
+    
+    <div class="main-content">
+        <!-- Левая панель - Маршрут -->
+        <div class="route-panel">
+            <h2 class="panel-title">📋 Настройка маршрута</h2>
+            
+            <div class="route-setup">
+                <h3>Настроить маршрут</h3>
+                <div class="form-group">
+                    <label>Диагноз:</label>
+                    <select id="diagnosisSelect">
+                        <option value="">Выберите диагноз</option>
+                        <option value="подозрение_простата">Подозрение на рак простаты</option>
+                        <option value="подозрение_почка">Подозрение на рак почки</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Этап:</label>
+                    <select id="stageSelect">
+                        <option value="">Выберите этап</option>
+                        <option value="диагностика">Диагностика</option>
+                        <option value="лечение">Лечение</option>
+                        <option value="наблюдение">Наблюдение</option>
+                    </select>
+                </div>
+                <button class="btn-small" id="setupRouteBtn">Настроить маршрут</button>
+            </div>
+            
+            <div class="route-setup">
+                <h3>Задать вопрос по маршруту</h3>
+                <div class="form-group">
+                    <input type="text" id="routeQuestionInput" placeholder="Например: Как подготовиться к ПСА?">
+                </div>
+                <button class="btn-small" id="askRouteBtn">Спросить</button>
+            </div>
+        </div>
+        
+        <!-- Центральная панель - Чат -->
+        <div class="chat-panel">
+            <h2 class="panel-title">💬 Чат с ИИ поддержки</h2>
+            
+            <div class="messages-container" id="messagesContainer">
+                <div class="message ai-message">
+                    <strong>Добро пожаловать в маршрутный помощник!</strong><br><br>
+                    Здесь вы можете:<br>
+                    • Получить эмоциональную поддержку<br>
+                    • Настроить свой медицинский маршрут<br>
+                    • Получить информацию по обследованиям<br><br>
+                    Расскажите, как вы себя чувствуете?
+                </div>
+            </div>
+            
+            <div class="input-container">
+                <input type="text" class="message-input" id="messageInput" placeholder="Введите сообщение..." autocomplete="off">
+                <button class="send-button" id="sendButton">➤</button>
+            </div>
+        </div>
+        
+        <!-- Правая панель - Информация -->
+        <div class="info-panel">
+            <h2 class="panel-title">ℹ️ Ваш маршрут</h2>
+            
+            <div class="info-section">
+                <h3>📅 Назначенные процедуры</h3>
+                <div id="appointmentsList">
+                    <p>Настройте маршрут для просмотра назначений</p>
+                </div>
+            </div>
+            
+            <div class="info-section">
+                <h3>📘 Подготовка к обследованиям</h3>
+                <div id="preparationsList">
+                    <p>Информация появится после настройки маршрута</p>
+                </div>
+            </div>
+            
+            <div class="info-section">
+                <h3>📍 Полезная информация</h3>
+                <div style="font-size: 0.9em; line-height: 1.5;">
+                    <p><strong>📞 Экстренная помощь:</strong><br>Поликлиника - 55-55-55</p>
+                    <p><strong>🏥 Отделение урологии:</strong><br>3 этаж, каб. 305</p>
+                    <p><strong>🕒 Часы работы:</strong><br>Пн-Пт: 8:00-17:00</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class RouteChatApp {
+            constructor() {
+                this.user_id = null;
+                this.subscription_status = 'free';
+                this.current_route = null;
+                this.init();
+            }
+            
+            async init() {
+                // Проверяем авторизацию
+                await this.checkAuthStatus();
+                
+                // Загружаем маршрут
+                await this.loadRoute();
+                
+                // Назначаем события
+                this.bindEvents();
+            }
+            
+            async checkAuthStatus() {
+                try {
+                    const response = await fetch('/api/auth/status');
+                    const data = await response.json();
+                    
+                    if (!data.authenticated) {
+                        window.location.href = '/';
+                        return;
+                    }
+                    
+                    this.user_id = data.user_id;
+                    this.subscription_status = data.subscription_status;
+                    document.getElementById('userName').textContent = 
+                        data.subscription_status === 'demo' ? 'Демо-пользователь' : 'Пользователь';
+                        
+                } catch (error) {
+                    console.error('Ошибка проверки авторизации:', error);
+                    window.location.href = '/';
+                }
+            }
+            
+            bindEvents() {
+                // Кнопки маршрута
+                document.getElementById('setupRouteBtn').addEventListener('click', () => this.setupRoute());
+                document.getElementById('askRouteBtn').addEventListener('click', () => this.askRouteQuestion());
+                document.getElementById('routeQuestionInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.askRouteQuestion();
+                });
+                
+                // Чат
+                document.getElementById('sendButton').addEventListener('click', () => this.sendMessage());
+                document.getElementById('messageInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.sendMessage();
+                });
+                
+                // Выход
+                document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
+            }
+            
+            async setupRoute() {
+                const diagnosis = document.getElementById('diagnosisSelect').value;
+                const stage = document.getElementById('stageSelect').value;
+                
+                if (!diagnosis || !stage) {
+                    this.addSystemMessage('Выберите диагноз и этап', 'ai');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/route/setup', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            diagnosis: diagnosis,
+                            stage: stage,
+                            procedures: this.getDefaultProcedures(diagnosis)
+                        })
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.addSystemMessage(data.message, 'ai');
+                        await this.loadRoute();
+                    } else {
+                        this.addSystemMessage(data.error || 'Ошибка настройки маршрута', 'ai');
+                    }
+                } catch (error) {
+                    console.error('Ошибка настройки маршрута:', error);
+                    this.addSystemMessage('Ошибка подключения к серверу', 'ai');
+                }
+            }
+            
+            getDefaultProcedures(diagnosis) {
+                const proceduresMap = {
+                    'подозрение_простата': ['ПСА', 'УЗИ_простаты', 'МРТ_малого_таза'],
+                    'подозрение_почка': ['КТ_почек', 'УЗИ_почек', 'Анализы_крови']
+                };
+                return proceduresMap[diagnosis] || [];
+            }
+            
+            async loadRoute() {
+                try {
+                    const response = await fetch('/api/route/current');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.current_route = data.route;
+                        this.displayRoute();
+                    }
+                } catch (error) {
+                    console.error('Ошибка загрузки маршрута:', error);
+                }
+            }
+            
+            displayRoute() {
+                if (!this.current_route) return;
+                
+                // Отображаем назначения
+                const appointmentsHtml = this.current_route.appointments.map(app => `
+                    <div class="appointment-item">
+                        <strong>${app.procedure}</strong>
+                        <div style="font-size: 0.8em; margin-top: 5px;">
+                            <span class="appointment-status status-${app.status}">${app.status}</span>
+                        </div>
+                    </div>
+                `).join('');
+                
+                document.getElementById('appointmentsList').innerHTML = 
+                    appointmentsHtml || '<p>Нет назначенных процедур</p>';
+                
+                // Отображаем подготовку
+                const preparationsHtml = Object.entries(this.current_route.preparations).map(([proc, prep]) => `
+                    <div class="preparation-item">
+                        <strong>${proc}:</strong> ${prep}
+                    </div>
+                `).join('');
+                
+                document.getElementById('preparationsList').innerHTML = 
+                    preparationsHtml || '<p>Информация появится после настройки</p>';
+            }
+            
+            async askRouteQuestion() {
+                const question = document.getElementById('routeQuestionInput').value.trim();
+                if (!question) return;
+                
+                try {
+                    const response = await fetch('/api/route/chat', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({question: question})
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.addSystemMessage(`Вопрос: ${question}`, 'user');
+                        this.addSystemMessage(data.response, 'ai');
+                        document.getElementById('routeQuestionInput').value = '';
+                    }
+                } catch (error) {
+                    console.error('Ошибка маршрутизации:', error);
+                    this.addSystemMessage('Ошибка подключения к серверу', 'ai');
+                }
+            }
+            
+            async sendMessage() {
+                const text = document.getElementById('messageInput').value.trim();
+                if (!text) return;
+                
+                this.addSystemMessage(text, 'user');
+                document.getElementById('messageInput').value = '';
+
+                const sendButton = document.getElementById('sendButton');
+                sendButton.disabled = true;
+                sendButton.textContent = '...';
+                
+                try {
+                    const response = await fetch('/api/send', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({text})
+                    });
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.addSystemMessage(data.response, 'ai');
+                    } else {
+                        this.addSystemMessage(data.error || 'Не удалось отправить сообщение', 'ai');
+                    }
+                } catch (error) {
+                    console.error('Ошибка отправки сообщения:', error);
+                    this.addSystemMessage('Ошибка подключения к серверу', 'ai');
+                } finally {
+                    sendButton.disabled = false;
+                    sendButton.textContent = '➤';
+                }
+            }
+            
+            addSystemMessage(text, sender) {
+                const messagesContainer = document.getElementById('messagesContainer');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${sender}-message`;
+                messageDiv.textContent = text;
+                messageDiv.style.whiteSpace = 'pre-line';
+                messagesContainer.appendChild(messageDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            async logout() {
+                try {
+                    await fetch('/api/auth/logout', {method: 'POST'});
+                    window.location.href = '/';
+                } catch (error) {
+                    console.error('Ошибка выхода:', error);
+                    window.location.href = '/';
+                }
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            window.routeChatApp = new RouteChatApp();
+        });
+    </script>
+</body>
+</html>

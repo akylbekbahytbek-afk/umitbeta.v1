@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Онко-Чат | Авторизация</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .auth-container { width: 100%; max-width: 400px; background: white; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); padding: 40px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #667eea; margin-bottom: 10px; }
+        .header p { color: #666; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #333; }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 2px solid #e1e5e9; border-radius: 10px; font-size: 16px; transition: border-color 0.3s; }
+        .form-group input:focus, .form-group select:focus { border-color: #667eea; outline: none; }
+        .btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 15px; border-radius: 10px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; transition: transform 0.2s; margin-bottom: 15px; }
+        .btn:hover { transform: translateY(-2px); }
+        .btn-outline { background: white; color: #667eea; border: 2px solid #667eea; }
+        .links { text-align: center; margin-top: 20px; }
+        .links a { color: #667eea; text-decoration: none; font-weight: bold; }
+        .links a:hover { text-decoration: underline; }
+        .error { color: #e74c3c; background: #fdf2f2; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; }
+        .success { color: #27ae60; background: #f2fdf2; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="header">
+            <h1>🏥 Онко-Чат</h1>
+            <p>Эмоциональная поддержка и маршрутный помощник</p>
+        </div>
+        
+        <div id="errorBox" class="error"></div>
+        <div id="successBox" class="success"></div>
+        
+        <div id="loginForm">
+            <div class="form-group">
+                <label for="userId">ID от врача:</label>
+                <input type="text" id="userId" placeholder="Введите ваш ID">
+            </div>
+            <button class="btn" id="loginBtn">Войти</button>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <p><strong>ИЛИ</strong></p>
+            </div>
+            
+            <button class="btn btn-outline" id="demoBtn">Попробовать демо</button>
+        </div>
+        
+        <div class="links">
+            <p><a href="#" id="helpLink">Как получить ID от врача?</a></p>
+        </div>
+    </div>
+
+    <script>
+        class AuthApp {
+            constructor() {
+                this.init();
+            }
+            
+            init() {
+                document.getElementById('loginBtn').addEventListener('click', () => this.login());
+                document.getElementById('demoBtn').addEventListener('click', () => this.demoLogin());
+                document.getElementById('userId').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.login();
+                });
+            }
+            
+            async login() {
+                const userId = document.getElementById('userId').value.trim();
+                if (!userId) {
+                    this.showError('Введите ID от врача');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({user_id: userId})
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.showSuccess('Успешная авторизация!');
+                        setTimeout(() => {
+                            window.location.href = data.redirect_url;
+                        }, 1000);
+                    } else {
+                        this.showError(data.error || 'Ошибка авторизации');
+                    }
+                } catch (error) {
+                    console.error('Ошибка авторизации:', error);
+                    this.showError('Ошибка подключения к серверу');
+                }
+            }
+            
+            async demoLogin() {
+                try {
+                    const response = await fetch('/api/auth/register-demo', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'}
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.showSuccess(`Демо-доступ активирован! Ваш ID: ${data.user_id}`);
+                        setTimeout(() => {
+                            window.location.href = data.redirect_url;
+                        }, 2000);
+                    } else {
+                        this.showError(data.error || 'Ошибка получения демо-доступа');
+                    }
+                } catch (error) {
+                    console.error('Ошибка демо:', error);
+                    this.showError('Ошибка подключения к серверу');
+                }
+            }
+            
+            showError(message) {
+                const errorBox = document.getElementById('errorBox');
+                errorBox.textContent = message;
+                errorBox.style.display = 'block';
+                document.getElementById('successBox').style.display = 'none';
+            }
+            
+            showSuccess(message) {
+                const successBox = document.getElementById('successBox');
+                successBox.textContent = message;
+                successBox.style.display = 'block';
+                document.getElementById('errorBox').style.display = 'none';
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            new AuthApp();
+        });
+    </script>
+</body>
+</html>
