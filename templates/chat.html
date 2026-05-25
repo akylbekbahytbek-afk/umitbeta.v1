@@ -173,6 +173,7 @@
                 
                 // Загружаем маршрут
                 await this.loadRoute();
+                await this.loadMessages();
                 
                 // Назначаем события
                 this.bindEvents();
@@ -272,6 +273,22 @@
                 }
             }
             
+            async loadMessages() {
+                try {
+                    const response = await fetch('/api/messages');
+                    const data = await response.json();
+                    if (!data.success || !data.messages.length) return;
+
+                    const messagesContainer = document.getElementById('messagesContainer');
+                    messagesContainer.innerHTML = '';
+                    data.messages.forEach((message) => {
+                        this.addSystemMessage(message.text, message.sender);
+                    });
+                } catch (error) {
+                    console.error('Ошибка загрузки истории сообщений:', error);
+                }
+            }
+
             displayRoute() {
                 if (!this.current_route) return;
                 

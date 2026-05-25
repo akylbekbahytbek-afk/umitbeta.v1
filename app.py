@@ -4,6 +4,7 @@ import json
 import re
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from flask_cors import CORS
+from werkzeug.security import check_password_hash, generate_password_hash
 import requests
 from datetime import datetime
 import sqlite3
@@ -167,6 +168,7 @@ def init_db():
     if not DATABASE_URL or 'sqlite' in DATABASE_URL:
         conn.execute('''CREATE TABLE IF NOT EXISTS conversations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
             session_id TEXT,
             sender TEXT,
             text TEXT,
@@ -178,12 +180,38 @@ def init_db():
         conn.execute('''CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT UNIQUE,
+            username TEXT UNIQUE,
+            password_hash TEXT,
             session_id TEXT,
             subscription_status TEXT DEFAULT 'free',
             diagnosis TEXT,
             route_stage TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )''')
+
+        user_columns = {
+            row['name'] for row in conn.execute("PRAGMA table_info(users)").fetchall()
+        }
+        if 'username' not in user_columns:
+            conn.execute('ALTER TABLE users ADD COLUMN username TEXT')
+            conn.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username)')
+            conn.execute('UPDATE users SET username = user_id WHERE username IS NULL')
+        if 'password_hash' not in user_columns:
+            conn.execute('ALTER TABLE users ADD COLUMN password_hash TEXT')
+
+        conversation_columns = {
+            row['name'] for row in conn.execute("PRAGMA table_info(conversations)").fetchall()
+        }
+        if 'user_id' not in conversation_columns:
+            conn.execute('ALTER TABLE conversations ADD COLUMN user_id TEXT')
+            conn.execute('''UPDATE conversations
+                            SET user_id = (
+                                SELECT users.user_id
+                                FROM users
+                                WHERE users.session_id = conversations.session_id
+                                LIMIT 1
+                            )
+                            WHERE user_id IS NULL''')
         
         conn.execute('''CREATE TABLE IF NOT EXISTS appointments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -197,6 +225,7 @@ def init_db():
     else:
         conn.execute('''CREATE TABLE IF NOT EXISTS conversations (
             id SERIAL PRIMARY KEY,
+            user_id TEXT,
             session_id TEXT,
             sender TEXT,
             text TEXT,
@@ -208,12 +237,23 @@ def init_db():
         conn.execute('''CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             user_id TEXT UNIQUE,
+            username TEXT UNIQUE,
+            password_hash TEXT,
             session_id TEXT,
             subscription_status TEXT DEFAULT 'free',
             diagnosis TEXT,
             route_stage TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )''')
+        conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT UNIQUE')
+        conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT')
+        conn.execute('UPDATE users SET username = user_id WHERE username IS NULL')
+        conn.execute('ALTER TABLE conversations ADD COLUMN IF NOT EXISTS user_id TEXT')
+        conn.execute('''UPDATE conversations
+                        SET user_id = users.user_id
+                        FROM users
+                        WHERE conversations.user_id IS NULL
+                          AND users.session_id = conversations.session_id''')
         
         conn.execute('''CREATE TABLE IF NOT EXISTS appointments (
             id SERIAL PRIMARY KEY,
@@ -758,31 +798,31 @@ def detect_triggers(text):
         if any(keyword in normalized for keyword in keywords)
     ]
 
-def save_conversation_message(session_id, sender, text, emotion=None, triggers=None):
+def save_conversation_message(session_id, sender, text, emotion=None, triggers=None, user_id=None):
     triggers_json = json.dumps(triggers or [], ensure_ascii=False)
     conn = get_db_connection()
     if not DATABASE_URL or 'sqlite' in DATABASE_URL:
-        conn.execute('''INSERT INTO conversations (session_id, sender, text, emotion, triggers)
-                        VALUES (?, ?, ?, ?, ?)''', (session_id, sender, text, emotion, triggers_json))
+        conn.execute('''INSERT INTO conversations (user_id, session_id, sender, text, emotion, triggers)
+                        VALUES (?, ?, ?, ?, ?, ?)''', (user_id, session_id, sender, text, emotion, triggers_json))
     else:
         cursor = conn.cursor()
-        cursor.execute('''INSERT INTO conversations (session_id, sender, text, emotion, triggers)
-                          VALUES (%s, %s, %s, %s, %s)''', (session_id, sender, text, emotion, triggers_json))
+        cursor.execute('''INSERT INTO conversations (user_id, session_id, sender, text, emotion, triggers)
+                          VALUES (%s, %s, %s, %s, %s, %s)''', (user_id, session_id, sender, text, emotion, triggers_json))
     conn.commit()
     conn.close()
 
-def get_recent_messages(session_id, limit=8):
+def get_recent_messages(session_id, limit=8, user_id=None):
     conn = get_db_connection()
     if not DATABASE_URL or 'sqlite' in DATABASE_URL:
         cursor = conn.execute('''SELECT sender, text FROM conversations
-                                 WHERE session_id = ?
-                                 ORDER BY id DESC LIMIT ?''', (session_id, limit))
+                                 WHERE (user_id = ? OR (user_id IS NULL AND session_id = ?))
+                                 ORDER BY id DESC LIMIT ?''', (user_id, session_id, limit))
         rows = cursor.fetchall()
     else:
         cursor = conn.cursor()
         cursor.execute('''SELECT sender, text FROM conversations
-                          WHERE session_id = %s
-                          ORDER BY id DESC LIMIT %s''', (session_id, limit))
+                          WHERE (user_id = %s OR (user_id IS NULL AND session_id = %s))
+                          ORDER BY id DESC LIMIT %s''', (user_id, session_id, limit))
         rows = cursor.fetchall()
     conn.close()
     return list(reversed([dict(row) for row in rows]))
@@ -905,52 +945,93 @@ def auth_status():
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    """Авторизация по ID от врача"""
-    data = request.json
-    user_id = data.get('user_id')
-    
-    if not user_id:
-        return jsonify({'success': False, 'error': 'Требуется ID пользователя'}), 400
-    
+    """Authenticate a user with username and password."""
+    data = request.json or {}
+    username = (data.get('username') or data.get('user_id') or '').strip()
+    password = data.get('password') or ''
+
+    if not username or not password:
+        return jsonify({'success': False, 'error': 'Введите логин и пароль'}), 400
+
     conn = get_db_connection()
     if not DATABASE_URL or 'sqlite' in DATABASE_URL:
-        cursor = conn.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
+        cursor = conn.execute('SELECT * FROM users WHERE username = ? OR user_id = ?', (username, username))
         user = cursor.fetchone()
-        
+
         if not user:
-            # Создаем нового пользователя
-            session_id = str(uuid.uuid4())
-            conn.execute('''INSERT INTO users (user_id, session_id, subscription_status) 
-                           VALUES (?, ?, ?)''', (user_id, session_id, 'demo'))
-            conn.commit()
-            user_data = {'user_id': user_id, 'session_id': session_id, 'subscription_status': 'demo'}
+            conn.close()
+            return jsonify({'success': False, 'error': 'Пользователь не найден. Зарегистрируйтесь.'}), 404
+        user_data = dict(user)
+        if user_data.get('password_hash'):
+            if not check_password_hash(user_data['password_hash'], password):
+                conn.close()
+                return jsonify({'success': False, 'error': 'Неверный пароль'}), 401
         else:
-            user_data = dict(user)
+            conn.execute('UPDATE users SET username = ?, password_hash = ? WHERE user_id = ?',
+                         (username, generate_password_hash(password), user_data['user_id']))
+            conn.commit()
     else:
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM users WHERE user_id = %s', (user_id,))
+        cursor.execute('SELECT * FROM users WHERE username = %s OR user_id = %s', (username, username))
         user = cursor.fetchone()
-        
+
         if not user:
-            session_id = str(uuid.uuid4())
-            cursor.execute('''INSERT INTO users (user_id, session_id, subscription_status) 
-                             VALUES (%s, %s, %s)''', (user_id, session_id, 'demo'))
-            conn.commit()
-            user_data = {'user_id': user_id, 'session_id': session_id, 'subscription_status': 'demo'}
+            conn.close()
+            return jsonify({'success': False, 'error': 'Пользователь не найден. Зарегистрируйтесь.'}), 404
+        user_data = dict(user)
+        if user_data.get('password_hash'):
+            if not check_password_hash(user_data['password_hash'], password):
+                conn.close()
+                return jsonify({'success': False, 'error': 'Неверный пароль'}), 401
         else:
-            user_data = dict(user)
-    
+            cursor.execute('UPDATE users SET username = %s, password_hash = %s WHERE user_id = %s',
+                           (username, generate_password_hash(password), user_data['user_id']))
+            conn.commit()
+
     conn.close()
-    
-    # Устанавливаем сессию
+
     session['user_id'] = user_data['user_id']
     session['session_id'] = user_data['session_id']
-    
+
     return jsonify({
         'success': True,
         'subscription_status': user_data['subscription_status'],
         'redirect_url': '/chat'
     })
+
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    """Register a separate user account."""
+    data = request.json or {}
+    username = (data.get('username') or '').strip()
+    password = data.get('password') or ''
+
+    if len(username) < 3:
+        return jsonify({'success': False, 'error': 'Логин должен быть не короче 3 символов'}), 400
+    if len(password) < 6:
+        return jsonify({'success': False, 'error': 'Пароль должен быть не короче 6 символов'}), 400
+
+    user_id = username
+    session_id = str(uuid.uuid4())
+    password_hash = generate_password_hash(password)
+    conn = get_db_connection()
+    try:
+        if not DATABASE_URL or 'sqlite' in DATABASE_URL:
+            conn.execute('''INSERT INTO users (user_id, username, password_hash, session_id, subscription_status)
+                            VALUES (?, ?, ?, ?, ?)''', (user_id, username, password_hash, session_id, 'free'))
+        else:
+            cursor = conn.cursor()
+            cursor.execute('''INSERT INTO users (user_id, username, password_hash, session_id, subscription_status)
+                              VALUES (%s, %s, %s, %s, %s)''', (user_id, username, password_hash, session_id, 'free'))
+        conn.commit()
+    except Exception:
+        conn.close()
+        return jsonify({'success': False, 'error': 'Такой логин уже занят'}), 409
+    conn.close()
+
+    session['user_id'] = user_id
+    session['session_id'] = session_id
+    return jsonify({'success': True, 'subscription_status': 'free', 'redirect_url': '/chat'})
 
 @app.route('/api/auth/register-demo', methods=['POST'])
 def register_demo():
@@ -1123,7 +1204,7 @@ def get_messages():
     if 'session_id' not in session:
         return jsonify({'success': False, 'error': 'Требуется авторизация'}), 401
 
-    messages = get_recent_messages(session['session_id'], limit=50)
+    messages = get_recent_messages(session['session_id'], limit=50, user_id=session.get('user_id'))
     return jsonify({'success': True, 'messages': messages})
 
 @app.route('/api/send', methods=['POST'])
@@ -1140,11 +1221,11 @@ def send_message():
     triggers = detect_triggers(text)
     admin_alerts = detect_admin_alerts(text)
     session_id = session['session_id']
-    recent_messages = get_recent_messages(session_id)
+    recent_messages = get_recent_messages(session_id, user_id=session.get('user_id'))
     deterministic_response = deterministic_support_response(text, emotion, triggers, recent_messages)
     knowledge_match = find_knowledge_entry(text) if should_use_knowledge_base(text, emotion) else None
 
-    save_conversation_message(session_id, 'user', text, emotion, triggers)
+    save_conversation_message(session_id, 'user', text, emotion, triggers, user_id=session.get('user_id'))
     if admin_alerts:
         response_text = crisis_response(admin_alerts)
         source = 'crisis_rules'
@@ -1156,7 +1237,7 @@ def send_message():
         source = 'knowledge_base'
     else:
         response_text, source = generate_ai_response(text, emotion, triggers, session_id)
-    save_conversation_message(session_id, 'ai', response_text, emotion, triggers)
+    save_conversation_message(session_id, 'ai', response_text, emotion, triggers, user_id=session.get('user_id'))
 
     return jsonify({
         'success': True,

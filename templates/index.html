@@ -6,97 +6,107 @@
     <title>Онко-Чат | Авторизация</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); height: 100vh; display: flex; justify-content: center; align-items: center; }
-        .auth-container { width: 100%; max-width: 400px; background: white; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); padding: 40px; }
-        .header { text-align: center; margin-bottom: 30px; }
-        .header h1 { color: #667eea; margin-bottom: 10px; }
-        .header p { color: #666; }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #333; }
-        .form-group input, .form-group select { width: 100%; padding: 12px; border: 2px solid #e1e5e9; border-radius: 10px; font-size: 16px; transition: border-color 0.3s; }
-        .form-group input:focus, .form-group select:focus { border-color: #667eea; outline: none; }
-        .btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 15px; border-radius: 10px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; transition: transform 0.2s; margin-bottom: 15px; }
-        .btn:hover { transform: translateY(-2px); }
-        .btn-outline { background: white; color: #667eea; border: 2px solid #667eea; }
-        .links { text-align: center; margin-top: 20px; }
-        .links a { color: #667eea; text-decoration: none; font-weight: bold; }
-        .links a:hover { text-decoration: underline; }
-        .error { color: #e74c3c; background: #fdf2f2; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; }
-        .success { color: #27ae60; background: #f2fdf2; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #2d7a8a 0%, #714c8c 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .auth-container { width: 100%; max-width: 420px; background: white; border-radius: 14px; box-shadow: 0 20px 40px rgba(0,0,0,0.16); padding: 34px; }
+        .header { text-align: center; margin-bottom: 24px; }
+        .header h1 { color: #2d7a8a; margin-bottom: 8px; font-size: 28px; }
+        .header p { color: #666; line-height: 1.4; }
+        .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 22px; }
+        .tab { border: 1px solid #d9e2e7; background: #f7fafb; color: #334; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 700; }
+        .tab.active { background: #2d7a8a; color: white; border-color: #2d7a8a; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 7px; font-weight: 700; color: #333; }
+        .form-group input { width: 100%; padding: 12px; border: 2px solid #e1e5e9; border-radius: 8px; font-size: 16px; transition: border-color 0.2s; }
+        .form-group input:focus { border-color: #2d7a8a; outline: none; }
+        .btn { background: #2d7a8a; color: white; border: none; padding: 14px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 16px; font-weight: 700; margin-top: 4px; }
+        .btn:hover { background: #246674; }
+        .btn-outline { background: white; color: #2d7a8a; border: 2px solid #2d7a8a; margin-top: 12px; }
+        .error, .success { padding: 10px; border-radius: 7px; margin-bottom: 15px; display: none; line-height: 1.4; }
+        .error { color: #b42318; background: #fff0ee; }
+        .success { color: #16703b; background: #eefbf3; }
     </style>
 </head>
 <body>
     <div class="auth-container">
         <div class="header">
-            <h1>🏥 Онко-Чат</h1>
-            <p>Эмоциональная поддержка и маршрутный помощник</p>
+            <h1>Онко-Чат</h1>
+            <p>Личный чат с ИИ-помощником. История сохраняется отдельно для каждого аккаунта.</p>
         </div>
-        
+
+        <div class="tabs">
+            <button class="tab active" id="loginTab">Войти</button>
+            <button class="tab" id="registerTab">Регистрация</button>
+        </div>
+
         <div id="errorBox" class="error"></div>
         <div id="successBox" class="success"></div>
-        
-        <div id="loginForm">
-            <div class="form-group">
-                <label for="userId">ID от врача:</label>
-                <input type="text" id="userId" placeholder="Введите ваш ID">
-            </div>
-            <button class="btn" id="loginBtn">Войти</button>
-            
-            <div style="text-align: center; margin: 20px 0;">
-                <p><strong>ИЛИ</strong></p>
-            </div>
-            
-            <button class="btn btn-outline" id="demoBtn">Попробовать демо</button>
+
+        <div class="form-group">
+            <label for="username">Логин</label>
+            <input type="text" id="username" placeholder="Введите логин" autocomplete="username">
         </div>
-        
-        <div class="links">
-            <p><a href="#" id="helpLink">Как получить ID от врача?</a></p>
+        <div class="form-group">
+            <label for="password">Пароль</label>
+            <input type="password" id="password" placeholder="Введите пароль" autocomplete="current-password">
         </div>
+
+        <button class="btn" id="submitBtn">Войти</button>
+        <button class="btn btn-outline" id="demoBtn">Попробовать демо</button>
     </div>
 
     <script>
         class AuthApp {
             constructor() {
-                this.init();
+                this.mode = 'login';
+                this.bindEvents();
             }
-            
-            init() {
-                document.getElementById('loginBtn').addEventListener('click', () => this.login());
+
+            bindEvents() {
+                document.getElementById('loginTab').addEventListener('click', () => this.setMode('login'));
+                document.getElementById('registerTab').addEventListener('click', () => this.setMode('register'));
+                document.getElementById('submitBtn').addEventListener('click', () => this.submit());
                 document.getElementById('demoBtn').addEventListener('click', () => this.demoLogin());
-                document.getElementById('userId').addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') this.login();
+                document.getElementById('password').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.submit();
                 });
             }
-            
-            async login() {
-                const userId = document.getElementById('userId').value.trim();
-                if (!userId) {
-                    this.showError('Введите ID от врача');
+
+            setMode(mode) {
+                this.mode = mode;
+                document.getElementById('loginTab').classList.toggle('active', mode === 'login');
+                document.getElementById('registerTab').classList.toggle('active', mode === 'register');
+                document.getElementById('submitBtn').textContent = mode === 'login' ? 'Войти' : 'Зарегистрироваться';
+                this.hideMessages();
+            }
+
+            async submit() {
+                const username = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value;
+                if (!username || !password) {
+                    this.showError('Введите логин и пароль');
                     return;
                 }
-                
+
+                const endpoint = this.mode === 'login' ? '/api/auth/login' : '/api/auth/register';
                 try {
-                    const response = await fetch('/api/auth/login', {
+                    const response = await fetch(endpoint, {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({user_id: userId})
+                        body: JSON.stringify({username, password})
                     });
                     const data = await response.json();
-                    
+
                     if (data.success) {
-                        this.showSuccess('Успешная авторизация!');
-                        setTimeout(() => {
-                            window.location.href = data.redirect_url;
-                        }, 1000);
+                        this.showSuccess(this.mode === 'login' ? 'Вход выполнен' : 'Аккаунт создан');
+                        setTimeout(() => window.location.href = data.redirect_url, 500);
                     } else {
-                        this.showError(data.error || 'Ошибка авторизации');
+                        this.showError(data.error || 'Не удалось выполнить действие');
                     }
                 } catch (error) {
-                    console.error('Ошибка авторизации:', error);
                     this.showError('Ошибка подключения к серверу');
                 }
             }
-            
+
             async demoLogin() {
                 try {
                     const response = await fetch('/api/auth/register-demo', {
@@ -104,39 +114,36 @@
                         headers: {'Content-Type': 'application/json'}
                     });
                     const data = await response.json();
-                    
                     if (data.success) {
-                        this.showSuccess(`Демо-доступ активирован! Ваш ID: ${data.user_id}`);
-                        setTimeout(() => {
-                            window.location.href = data.redirect_url;
-                        }, 2000);
+                        this.showSuccess(`Демо-доступ активирован. ID: ${data.user_id}`);
+                        setTimeout(() => window.location.href = data.redirect_url, 900);
                     } else {
-                        this.showError(data.error || 'Ошибка получения демо-доступа');
+                        this.showError(data.error || 'Ошибка демо-доступа');
                     }
                 } catch (error) {
-                    console.error('Ошибка демо:', error);
                     this.showError('Ошибка подключения к серверу');
                 }
             }
-            
-            showError(message) {
-                const errorBox = document.getElementById('errorBox');
-                errorBox.textContent = message;
-                errorBox.style.display = 'block';
+
+            hideMessages() {
+                document.getElementById('errorBox').style.display = 'none';
                 document.getElementById('successBox').style.display = 'none';
             }
-            
+
+            showError(message) {
+                document.getElementById('errorBox').textContent = message;
+                document.getElementById('errorBox').style.display = 'block';
+                document.getElementById('successBox').style.display = 'none';
+            }
+
             showSuccess(message) {
-                const successBox = document.getElementById('successBox');
-                successBox.textContent = message;
-                successBox.style.display = 'block';
+                document.getElementById('successBox').textContent = message;
+                document.getElementById('successBox').style.display = 'block';
                 document.getElementById('errorBox').style.display = 'none';
             }
         }
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            new AuthApp();
-        });
+
+        document.addEventListener('DOMContentLoaded', () => new AuthApp());
     </script>
 </body>
 </html>
